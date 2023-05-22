@@ -1,0 +1,129 @@
+import tkinter as tk
+from tkinter import colorchooser
+from tkinter import messagebox
+import urllib.request
+from PIL import Image, ImageTk
+import random
+import math
+
+class ImageApp:
+    def __init__(self, root):
+        self.root = root
+        self.canvas = tk.Canvas(self.root, width=400, height=400)
+        self.canvas.pack()
+
+        self.images = []
+        self.selected_images = []
+        self.grouped_images = []
+        self.image_objects = {}
+
+        self.load_button = tk.Button(self.root, text="Load Image", command=self.load_image)
+        self.load_button.pack(side=tk.LEFT)
+
+        self.group_button = tk.Button(self.root, text="Group Images", command=self.group_images)
+        self.group_button.pack(side=tk.LEFT)
+
+        self.color_button = tk.Button(self.root, text="Change Color", command=self.change_color)
+        self.color_button.pack(side=tk.LEFT)
+
+        self.size_button = tk.Button(self.root, text="Change Size", command=self.change_size)
+        self.size_button.pack(side=tk.LEFT)
+
+        self.connect_button = tk.Button(self.root, text="Connect Centers", command=self.connect_centers)
+        self.connect_button.pack(side=tk.LEFT)
+
+        self.canvas.bind("<Button-1>", self.select_image)
+        self.canvas.bind("<B1-Motion>", self.move_selected_images)
+
+    def load_image(self):
+        image_url = "https://via.placeholder.com/100x100.png?text=Image{}".format(len(self.images))
+        image_path = "image{}.png".format(len(self.images))
+        urllib.request.urlretrieve(image_url, image_path)
+        self.images.append(image_path)
+
+        self.render_image(image_path)
+
+    def render_image(self, image_path):
+        image = Image.open(image_path)
+        image = image.resize((100, 100))
+        photo = ImageTk.PhotoImage(image)
+        x = random.randint(50, 350)
+        y = random.randint(50, 350)
+        item = self.canvas.create_image(x, y, image=photo, anchor=tk.CENTER, tags=(image_path, "image"))
+        self.canvas.tag_bind(item, "<Button-1>", lambda event: self.select_image(event, item))
+        self.canvas.tag_bind(item, "<B1-Motion>", self.move_selected_images)
+        self.canvas.tag_bind(item, "<Double-Button-1>", lambda event: self.display_image_info(image_path))
+        self.image_objects[item] = photo
+
+    def select_image(self, event, item=None):
+        if item:
+            if item in self.selected_images:
+                self.selected_images.remove(item)
+                self.canvas.itemconfig(item, width=1)
+            else:
+                self.selected_images.append(item)
+                self.canvas.itemconfig(item, width=2)
+        else:
+            self.selected_images = []
+            self.canvas.dtag("selected")
+            self.canvas.itemconfig("image", width=1)
+
+    def move_selected_images(self, event):
+        for item in self.selected_images:
+            self.canvas.coords(item, event.x, event.y)
+
+    def group_images(self):
+        if len(self.selected_images) > 1:
+            self.grouped_images.extend(self.selected_images)
+            self.selected_images = []
+            self.canvas.dtag("selected")
+            self.canvas.itemconfigure("selected", outline="")
+        else:
+            messagebox.showwarning("Warning, Please select more than one image to group.")
+
+    def change_color(self):
+        if self.selected_images:
+            color = colorchooser.askcolor(title="Select Color")
+            if color[1]:
+                for image_path in self.selected_images:
+                                        self.canvas.itemconfigure(image_path, fill=color[1])
+        else:
+            messagebox.showwarning("Warning", "Please select an image to change its color.")
+
+    def change_size(self):
+        if self.selected_images:
+            size = simpledialog.askinteger("Change Size", "Enter new size (in pixels):", parent=self.root)
+            if size:
+                for image_path in self.selected_images:
+                    image = Image.open(image_path)
+                    image = image.resize((size, size))
+                    photo = ImageTk.PhotoImage(image)
+                    self.canvas.itemconfigure(image_path, image=photo)
+                    self.image_objects.append(photo)  # Store the new PhotoImage object
+        else:
+            messagebox.showwarning("Warning", "Please select an image to change its size.")
+
+    def connect_centers(self):
+        if len(self.grouped_images) > 1:
+            center_x = 0
+            center_y = 0
+            for image_path in self.grouped_images:
+                x, y = self.canvas.coords(image_path)
+                center_x += x
+                center_y += y
+            center_x /= len(self.grouped_images)
+            center_y /= len(self.grouped_images)
+            for image_path in self.grouped_images:
+                x, y = self.canvas.coords(image_path)
+                self.canvas.create_line(center_x, center_y, x, y, fill="black")
+        else:
+            messagebox.showwarning("Warning, Please group multiple images before connecting their centers.")
+
+    def display_image_info(self, image_path):
+        image = Image.open(image_path)
+        size = image.size
+        messagebox.showinfo("Image Info", f"Image Path: {image_path}\nSize: {size[0]}x{size[1]}\nColor: {self.canvas.itemcget(image_path, 'fill')}")
+
+root = tk.Tk()
+app = ImageApp(root)
+root.mainloop()
